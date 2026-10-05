@@ -81,6 +81,29 @@ still counting them as good: they paid in full, and the target is default
 the application variables anyway. I'll refit with them as bad to see how much
 it matters.
 
+
+### OOT: 147 loans still open
+The sample check in `sql/02_population.sql` found 147 loans in the 2015 OOT set
+that were not closed at the data cut-off. So the note above (every loan is Fully
+Paid or Charged Off) holds for train and validation, not for OOT. Most were issued
+Oct to Dec 2015 and simply hadn't reached the end of their term.
+
+| Status             | Loans |
+|--------------------|-------|
+| Current            | 72    |
+| In Grace Period    | 9     |
+| Late (16-30 days)  | 5     |
+| Late (31-120 days) | 61    |
+
+Dropped all 147. None of them is charged off, so they don't have a final outcome
+under the default definition. Counting the 61 Late (31-120) loans as bad would
+move the OOT bad rate from 14.89% to 14.90%, so the choice doesn't matter in
+practice.
+
+Sample sizes after this:
+train 120,683 (15,007 bad, 12.4%), validation 162,570 (22,315 bad, 13.7%),
+OOT 283,026 (42,132 bad, 14.9%).
+
 ### Limitations so far
 - No monthly payment history, so days past due can't be seen. A loan that went
   past 90 days and then cured looks the same as a clean one.

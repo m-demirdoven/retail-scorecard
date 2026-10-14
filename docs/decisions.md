@@ -261,3 +261,66 @@ Notes:
 - FICO ended up with 13 bins. A scorecard used in practice would probably merge
   them into 5 or 6.
 - `percent_bc_gt_75` only moves the score by 4 points. Keep an eye on it.
+
+
+## Validation (notebooks/03_validation.ipynb)
+
+### Model frozen before OOT
+Saved as `models/scorecard_v1.joblib` and committed before the OOT set was scored
+for the first time (commit "Freeze scorecard v1 before opening OOT"). OOT was
+scored once and nothing was changed after that.
+
+### Discrimination
+
+| Sample     | Bad rate | Gini  | KS    | Gini of LC grade |
+|------------|----------|-------|-------|------------------|
+| train      | 12.4%    | 0.328 | 0.239 | 0.263            |
+| validation | 13.7%    | 0.323 | 0.232 | 0.300            |
+| OOT        | 14.9%    | 0.336 | 0.244 | 0.335            |
+
+No drop on OOT. Using application data only, the model matches or beats LC's own
+grade. To be fair to LC: `grade` only has 7 levels (A to G), which caps its Gini.
+`sub_grade` (35 levels) would be a fairer comparison and would probably do a bit
+better.
+
+### Calibration
+
+| Sample     | Predicted PD | Actual bad rate |
+|------------|--------------|-----------------|
+| train      | 12.4%        | 12.4%           |
+| validation | 13.1%        | 13.7%           |
+| OOT        | 13.0%        | 14.9%           |
+
+The model still ranks OOT loans well but underestimates the level by 1.9 points.
+The bad rate went up 2.5 points from train to OOT, and the model's predicted PD
+only moved 0.6 of that. So most of the increase isn't explained by who applied.
+Recommendation: recalibrate the PD level on recent data. No need to rebuild the
+model.
+
+### Stability
+PSI on score deciles, train as the base: validation 0.009, OOT 0.010,
+2016 0.002, 2017 0.013, 2018 0.068. All under 0.10. 2018 is moving up and worth
+watching.
+
+Read together with calibration: the same kind of applicants, but more of them
+going bad. Something outside the application data changed, like the economy or
+LC's own process.
+
+### Sensitivity to the default definition
+Same bins and variables, refitted with late-fee payers counted as bad. On the main
+target the alternative model gets Gini 0.327 / 0.322 / 0.336, against
+0.328 / 0.323 / 0.336 for v1. No coefficient changes sign. The choice made in the
+default definition doesn't matter in practice.
+
+### Cut-off (OOT, 1-1900 view)
+
+| Minimum score | Approved | Bad rate of approved | Bads avoided |
+|---------------|----------|----------------------|--------------|
+| none          | 100%     | 14.9%                | 0%           |
+| 700           | 86%      | 12.8%                | 26%          |
+| 800           | 71%      | 11.0%                | 47%          |
+| 900           | 53%      | 9.1%                 | 68%          |
+| 1000          | 35%      | 7.2%                 | 83%          |
+
+Which cut-off is right depends on the margin earned on good loans against the loss
+on bad ones. Not modelled here.

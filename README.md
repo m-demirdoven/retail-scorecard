@@ -1,5 +1,8 @@
 # Retail credit scorecard on Lending Club data
 
+
+*Türkçe: [README.tr.md](README.tr.md)*
+
 An application scorecard (PD model) for 36-month unsecured personal loans, built
 and validated the way a bank would do it: a sample design that deals with
 right-censoring, a written-down default definition, WoE binning and logistic
@@ -150,6 +153,15 @@ models/ frozen model (scorecard_v1.joblib)
 Python 3.10 with pandas, numpy, scipy, scikit-learn, statsmodels, optbinning,
 sqlalchemy and psycopg2-binary.
 
-## About
+## Conclusion
 
-Built by Mehmet Demirdöven 
+A simple 11-variable model built on application data alone ranks borrowers as well
+as Lending Club's own grade, and it keeps that performance out of time. Its weak
+spot is the level: the default rate went up in 2015 and the model didn't see it
+coming. If it were used in practice, the first job would be recalibrating it on
+recent data.
+
+Most of the work was about the data rather than the model: knowing which loans
+have a final outcome, when each field started being collected, and how the
+platform's own rules shape what the data can tell you. Missing any of these would
+have made the model look better on paper and work worse in practice.

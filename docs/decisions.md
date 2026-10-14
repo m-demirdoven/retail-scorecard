@@ -192,3 +192,72 @@ PSI and these are a tiny share.
 Missing `emp_length` keeps going up: 4.9% train, 5.9% validation, 6.7% OOT,
 8.1% monitoring. Missing is the riskiest group (17.7% bad in train), so this is
 another drift item for PSI.
+
+### Binning and variable selection (notebooks/02_binning.ipynb)
+Binning done with `optbinning` on train only. Numeric variables had to have a bad
+rate that only goes up or only goes down across bins (`auto_asc_desc`). Missing
+values get their own bin.
+
+60 candidates. What the IVs on train say:
+- FICO is the strongest at 0.129. Most variables sit between 0.02 and 0.08.
+  Nothing above 0.3.
+- Delinquency history is close to useless: `delinq_2yrs`, `mths_since_last_delinq`,
+  `pub_rec` and bankruptcies are all under 0.001. Most likely LC turned down
+  applicants with bad histories, so there's little left to learn among approved
+  loans.
+- `verification_status` has IV 0.002, so it's dropped. That closes the open point
+  above.
+- `loan_amnt` on its own is close to 0, but `loan_to_income` gets 0.047.
+
+Selection: kept IV >= 0.02 (28 variables). Where two variables had WoE correlation
+around 0.7 or more, kept the one with the higher IV, so roughly one per family.
+That left 12.
+- `home_ownership` vs `mort_acc` (correlation 0.65): kept `mort_acc`, since it
+  comes from the credit file and `home_ownership` is self-reported.
+- `mort_acc` was then dropped too: p-value 0.04 and Gini didn't move without it
+  (0.328 / 0.323 either way). Its information is mostly inside `tot_hi_cred_lim`.
+- `purpose` kept despite low IV (0.023). Small business loans are clearly riskier
+  and it's easy to explain.
+
+Final 11: `fico`, `annual_inc`, `tot_hi_cred_lim`, `bc_open_to_buy`, `dti`,
+`loan_to_income`, `acc_open_past_24mths`, `mths_since_recent_inq`,
+`percent_bc_gt_75`, `mo_sin_old_rev_tl_op`, `purpose`.
+
+### Model
+Logistic regression on WoE, fitted on train. All coefficients negative (higher WoE
+means safer, so lower PD). p-values all below 0.001 and VIF all under 2.5
+(checked on the 12-variable fit before dropping `mort_acc`).
+
+Gini 0.328 on train, 0.323 on validation. Lower than a typical bank application
+scorecard (0.5 to 0.7), which makes sense: approved loans only, FICO 660 and up,
+so the population is more uniform.
+
+### Scaling
+600 points at good:bad odds of 50:1, 20 points to double the odds.
+Points per bin = -factor x (coef x WoE + intercept / n) + offset / n.
+Total score runs from 464 to 632.
+
+How much each variable can move the score: `fico` 25, `acc_open_past_24mths` 24,
+`tot_hi_cred_lim` 20, `mths_since_recent_inq` / `bc_open_to_buy` / `loan_to_income`
+17, `purpose` 15, `annual_inc` 11, `dti` 10, `mo_sin_old_rev_tl_op` 8,
+`percent_bc_gt_75` 4.
+
+Also added a 1-1900 view that looks like the Turkish Findeks score: a straight
+stretch of 464-632 onto 1-1900. Cosmetic only, it doesn't mean the same as a real
+Findeks score.
+
+| Score (1-1900) | Bad rate train | Bad rate validation |
+|----------------|----------------|---------------------|
+| 1-699          | 25.6%          | 26.0%               |
+| 700-1099       | 12.8%          | 13.8%               |
+| 1100-1499      | 5.0%           | 5.5%                |
+| 1500-1699      | 1.0%           | 2.1%                |
+
+Bad rate drops band by band in both samples. Validation is a bit higher in every
+band: the model ranks 2014 well but slightly underestimates the level. To look at
+under calibration.
+
+Notes:
+- FICO ended up with 13 bins. A scorecard used in practice would probably merge
+  them into 5 or 6.
+- `percent_bc_gt_75` only moves the score by 4 points. Keep an eye on it.

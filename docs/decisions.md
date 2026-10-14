@@ -162,3 +162,33 @@ pick this up.
 Open: `verification_status`. Verified loans have a higher bad rate (13.0%) than
 Not Verified (12.0%), probably because LC chose whom to verify. That makes it
 partly LC's own risk view, like `grade`. Decide during binning.
+
+### Clean table (sql/04_build_clean.sql)
+`clean.lc_model`, one row per loan, 1,554,864 rows, every id unique.
+
+| Sample     | Loans   | Bad    | Bad rate | Bad (late fee counted) |
+|------------|---------|--------|----------|------------------------|
+| train      | 120,683 | 15,007 | 12.4%    | 16,758                 |
+| validation | 162,570 | 22,315 | 13.7%    | 25,062                 |
+| oot        | 283,026 | 42,132 | 14.9%    | 48,268                 |
+| monitoring | 988,585 | n/a    | n/a      | n/a                    |
+
+`bad_alt` counts late-fee payers as bad, for the sensitivity check. Their share
+goes up from 1.5% in train to 2.2% in OOT.
+
+`installment` is left out. It is built from `int_rate`, so it carries LC's own
+pricing. Added `loan_to_income` (loan_amnt / annual_inc) instead, plus
+`credit_hist_months` (issue date minus `earliest_cr_line`).
+
+Shortest credit history is 36 months in every sample. One more LC policy rule:
+nobody with less than three years of history.
+
+Odd values in monitoring only: 973 missing incomes, 91 incomes under 1,000 (one
+is 1, which gives `loan_to_income` = 35,000), 1,076 missing dti and 5 histories
+over 75 years. Train and validation are clean. OOT only has the 2 zero incomes
+and 3 dti cases noted above. Left as they are, since monitoring is only used for
+PSI and these are a tiny share.
+
+Missing `emp_length` keeps going up: 4.9% train, 5.9% validation, 6.7% OOT,
+8.1% monitoring. Missing is the riskiest group (17.7% bad in train), so this is
+another drift item for PSI.

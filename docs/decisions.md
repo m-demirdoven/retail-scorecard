@@ -113,3 +113,52 @@ OOT 283,026 (42,132 bad, 14.9%).
 ### Still open
 `installment` is built from `int_rate`, so it carries some of LC's pricing. Use
 it, or build affordability from `loan_amnt` and `annual_inc` instead?
+
+## 2026-10-14
+
+### Data quality (sql/03_data_quality.sql)
+Checked on the modelling population (`clean.v_population`, 566,279 loans).
+
+Format is fine. The 14 main numeric fields and the 43 bureau and months-since
+fields all cast to numeric without errors. `earliest_cr_line` is always Mon-YYYY
+and never after the issue date (range 1944 to Nov 2012).
+
+Impossible or placeholder values, to be set to missing in the clean table:
+- `annual_inc` = 0 (2 loans)
+- `dti` = 999 (1 loan)
+- `tot_hi_cred_lim` = 9,999,999 (6 loans), `total_rev_hi_lim` = 9,999,999 (3 loans)
+
+Too few to matter, but the rule is simple: if a value can't be real, treat it as
+missing instead of dropping the loan.
+
+Left as they are: `revol_util` over 100% (2,203 loans) and `bc_util` over 100%
+(10,350). Balances can go over the limit with interest and fees. Other extreme
+but possible values (`pub_rec` up to 86, `delinq_2yrs` up to 30, income up to 9M)
+are left for binning to absorb.
+
+Categoricals:
+- `home_ownership`: NONE (35) and OTHER (40) will be merged into RENT.
+- `emp_length`: "< 1 year" becomes 0, "10+ years" becomes 10. Missing stays as
+  its own group (5,858 loans in train, 17.7% bad vs 12.4% overall).
+- `purpose`: 14 values, small ones get grouped during binning.
+
+Dropped:
+- `num_tl_120dpd_2m`: missing share jumps from 0.2% in train to 4-5% in
+  validation and OOT, and the value is almost always 0.
+- `fico_range_high`: always `fico_range_low` + 4, so one of them is enough.
+
+Lending Club policy shows up in the data (not errors, but they limit what the
+model can learn):
+- FICO is never below 660.
+- `loan_amnt` is capped at 35,000.
+- The latest `earliest_cr_line` is Nov 2012, so nobody had a very short history.
+
+Drift to keep an eye on: the share of applicants with no past delinquency drops
+after train. `mths_since_last_delinq` is missing for 55.6% in train, 48.9% in
+validation and 48.0% in OOT, with a similar pattern for `major_derog` and
+`last_record`. Fits with the bad rate going up from 12.4% to 14.9%. PSI should
+pick this up.
+
+Open: `verification_status`. Verified loans have a higher bad rate (13.0%) than
+Not Verified (12.0%), probably because LC chose whom to verify. That makes it
+partly LC's own risk view, like `grade`. Decide during binning.

@@ -1,0 +1,4 @@
+sample,n,predicted_pd,actual_bad
+train,120683,0.124,0.124
+validation,162570,0.131,0.137
+oot,283026,0.13,0.149

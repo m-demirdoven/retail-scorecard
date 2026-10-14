@@ -1,0 +1,4 @@
+sample,n,bad_rate,gini_model,ks_model,gini_lc_grade
+train,120683,0.124,0.328,0.239,0.263
+validation,162570,0.137,0.323,0.232,0.3
+oot,283026,0.149,0.336,0.244,0.335
